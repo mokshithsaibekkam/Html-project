@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TaskFlow — To-Do App</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f13;
+      --surface: #1a1a24;
+      --surface2: #22222f;
+      --border: #2e2e3e;
+      --accent: #7c6dfa;
+      --accent-light: #a597ff;
+      --green: #34d399;
+      --red: #f87171;
+      --text: #e8e8f0;
+      --muted: #6b6b85;
+      --radius: 10px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 40px 16px 80px;
+    }
+
+    .app { width: 100%; max-width: 560px; }
+
+    .header { margin-bottom: 32px; }
+    .header h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text);
+    }
+    .header h1 span { color: var(--accent-light); }
+    .header p { color: var(--muted); font-size: 0.875rem; margin-top: 4px; }
+
+    .stats { display: flex; gap: 12px; margin-bottom: 24px; }
+    .stat {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      text-align: center;
+    }
+    .stat-num { font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; font-weight: 700; }
+    .stat-num.total  { color: var(--accent-light); }
+    .stat-num.active { color: #facc15; }
+    .stat-num.done   { color: var(--green); }
+    .stat-label {
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-top: 2px;
+    }
+
+    .input-area { display: flex; gap: 8px; margin-bottom: 20px; }
+    .input-area input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 0.95rem;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-area input::placeholder { color: var(--muted); }
+    .input-area input:focus { border-color: var(--accent); }
+
+    .btn-add {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 12px 20px;
+      font-size: 1.2rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s, transform 0.1s;
+      flex-shrink: 0;
+    }
+    .btn-add:hover  { background: var(--accent-light); }
+    .btn-add:active { transform: scale(0.97); }
+
+    .filters {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px;
+    }
+    .filter-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 8px;
+      border-radius: 7px;
+      font-size: 0.85rem;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .filter-btn.active { background: var(--accent); color: #fff; }
+    .filter-btn:not(.active):hover { color: var(--text); }
+
+    .task-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .empty-state { text-align: center; padding: 48px 16px; color: var(--muted); }
+    .empty-state .emoji { font-size: 2.5rem; display: block; margin-bottom: 12px; }
+    .empty-state p { font-size: 0.9rem; }
+
+    .task-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      transition: border-color 0.2s, background 0.2s;
+      animation: slideIn 0.2s ease;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .task-item:hover { border-color: var(--accent); }
+    .task-item.completed { border-color: var(--border); background: var(--bg); }
+
+    .checkbox {
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-radius: 50%;
+      flex-shrink: 0;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s;
+    }
+    .task-item.completed .checkbox { background: var(--green); border-color: var(--green); }
+    .checkbox::after {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #fff;
+      display: none;
+    }
+    .task-item.completed .checkbox::after { display: block; }
+
+    .task-text {
+      flex: 1;
+      font-size: 0.93rem;
+      line-height: 1.4;
+      word-break: break-word;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .task-item.completed .task-text { color: var(--muted); text-decoration: line-through; }
+
+    .task-edit-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.93rem;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      outline: none;
+    }
+
+    .task-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .icon-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 5px;
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .icon-btn:hover { background: var(--surface2); color: var(--text); }
+    .icon-btn.save { color: var(--green); }
+    .icon-btn.del  { color: var(--red); }
+    .icon-btn.del:hover { background: rgba(248,113,113,0.1); color: var(--red); }
+
+    .footer { margin-top: 20px; display: flex; justify-content: space-between; align-items: center; }
+    .footer-count { font-size: 0.8rem; color: var(--muted); }
+    .btn-clear {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      transition: all 0.15s;
+    }
+    .btn-clear:hover { border-color: var(--red); color: var(--red); }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <h1>Task<span>Flow</span></h1>
+    <p>Your tasks, your way — state-driven & persistent.</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-num total" id="stat-total">0</div><div class="stat-label">Total</div></div>
+    <div class="stat"><div class="stat-num active" id="stat-active">0</div><div class="stat-label">Active</div></div>
+    <div class="stat"><div class="stat-num done" id="stat-done">0</div><div class="stat-label">Done</div></div>
+  </div>
+
+  <div class="input-area">
+    <input type="text" id="task-input" placeholder="Add a new task… (Enter to save)" maxlength="200"/>
+    <button class="btn-add" id="add-btn">+</button>
+  </div>
+
+  <div class="filters">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="active">Active</button>
+    <button class="filter-btn" data-filter="completed">Completed</button>
+  </div>
+
+  <div class="task-list" id="task-list"></div>
+
+  <div class="footer">
+    <span class="footer-count" id="footer-count"></span>
+    <button class="btn-clear" id="clear-btn">Clear completed</button>
+  </div>
+
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let tasks = JSON.parse(localStorage.getItem('taskflow_tasks') || '[]');
+  let filter = 'all';
+  let editingId = null;
+
+  // ── Persistence ────────────────────────────────────────────────────────────
+  function save() {
+    try { localStorage.setItem('taskflow_tasks', JSON.stringify(tasks)); } catch(e) {}
+  }
+
+  // ── CRUD ───────────────────────────────────────────────────────────────────
+  function createTask(text) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    tasks.unshift({ id: Date.now(), text: trimmed, completed: false });
+    save(); render();
+  }
+
+  function toggleTask(id) {
+    const t = tasks.find(t => t.id === id);
+    if (t) { t.completed = !t.completed; save(); render(); }
+  }
+
+  function deleteTask(id) {
+    tasks = tasks.filter(t => t.id !== id);
+    if (editingId === id) editingId = null;
+    save(); render();
+  }
+
+  function startEdit(id) {
+    editingId = id; render();
+    const inp = document.querySelector('.task-edit-input');
+    if (inp) { inp.focus(); inp.select(); }
+  }
+
+  function saveEdit(id) {
+    const inp = document.querySelector('.task-edit-input');
+    if (!inp) return;
+    const val = inp.value.trim();
+    if (!val) return;
+    const t = tasks.find(t => t.id === id);
+    if (t) { t.text = val; save(); }
+    editingId = null; render();
+  }
+
+  function cancelEdit() { editingId = null; render(); }
+
+  function clearCompleted() {
+    tasks = tasks.filter(t => !t.completed);
+    save(); render();
+  }
+
+  // ── Filter ─────────────────────────────────────────────────────────────────
+  function filteredTasks() {
+    if (filter === 'active')    return tasks.filter(t => !t.completed);
+    if (filter === 'completed') return tasks.filter(t =>  t.completed);
+    return tasks;
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  function render() {
+    const list = document.getElementById('task-list');
+    const visible = filteredTasks();
+    const activeCount = tasks.filter(t => !t.completed).length;
+    const doneCount   = tasks.filter(t =>  t.completed).length;
+
+    document.getElementById('stat-total').textContent  = tasks.length;
+    document.getElementById('stat-active').textContent = activeCount;
+    document.getElementById('stat-done').textContent   = doneCount;
+    document.getElementById('footer-count').textContent =
+      activeCount === 0 ? 'All done! 🎉' : `${activeCount} task${activeCount !== 1 ? 's' : ''} remaining`;
+
+    if (visible.length === 0) {
+      list.innerHTML = `<div class="empty-state">
+        <span class="emoji">${filter === 'completed' ? '✅' : filter === 'active' ? '🌟' : '📝'}</span>
+        <p>${filter === 'all' ? 'No tasks yet. Add one above!' :
+            filter === 'active' ? 'No active tasks.' : 'No completed tasks.'}</p>
+      </div>`;
+      return;
+    }
+
+    list.innerHTML = '';
+    visible.forEach(task => {
+      const item = document.createElement('div');
+      item.className = 'task-item' + (task.completed ? ' completed' : '');
+      item.dataset.id = task.id;
+
+      const checkbox = `<div class="checkbox" data-action="toggle" data-id="${task.id}"></div>`;
+
+      const middle = editingId === task.id
+        ? `<input class="task-edit-input" value="${escHtml(task.text)}" maxlength="200" data-id="${task.id}"/>`
+        : `<div class="task-text" data-action="edit" data-id="${task.id}">${escHtml(task.text)}</div>`;
+
+      const actions = editingId === task.id
+        ? `<div class="task-actions">
+             <button class="icon-btn save" data-action="save" data-id="${task.id}">✔</button>
+             <button class="icon-btn" data-action="cancel">✕</button>
+           </div>`
+        : `<div class="task-actions">
+             <button class="icon-btn" data-action="edit" data-id="${task.id}">✏️</button>
+             <button class="icon-btn del" data-action="delete" data-id="${task.id}">🗑</button>
+           </div>`;
+
+      item.innerHTML = checkbox + middle + actions;
+      list.appendChild(item);
+    });
+  }
+
+  // ── Delegated Event Listeners ──────────────────────────────────────────────
+  document.getElementById('task-list').addEventListener('click', e => {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const id = Number(el.dataset.id);
+    const action = el.dataset.action;
+    if      (action === 'toggle') toggleTask(id);
+    else if (action === 'delete') deleteTask(id);
+    else if (action === 'edit')   startEdit(id);
+    else if (action === 'save')   saveEdit(id);
+    else if (action === 'cancel') cancelEdit();
+  });
+
+  document.getElementById('task-list').addEventListener('dblclick', e => {
+    const el = e.target.closest('.task-text');
+    if (el) startEdit(Number(el.dataset.id));
+  });
+
+  document.getElementById('task-list').addEventListener('keydown', e => {
+    if (e.target.classList.contains('task-edit-input')) {
+      const id = Number(e.target.dataset.id);
+      if (e.key === 'Enter')  saveEdit(id);
+      if (e.key === 'Escape') cancelEdit();
+    }
+  });
+
+  document.getElementById('add-btn').addEventListener('click', () => {
+    const inp = document.getElementById('task-input');
+    createTask(inp.value);
+    inp.value = '';
+    inp.focus();
+  });
+
+  document.getElementById('task-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { createTask(e.target.value); e.target.value = ''; }
+  });
+
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      filter = btn.dataset.filter;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      editingId = null;
+      render();
+    });
+  });
+
+  document.getElementById('clear-btn').addEventListener('click', clearCompleted);
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  render();
+</script>
+</body>
+</html>
