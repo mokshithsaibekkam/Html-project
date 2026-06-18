@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weather Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0d1120;
+    color: #e8edf5;
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  h1 { font-size: 1.8rem; margin-bottom: 1.5rem; }
+
+  .search-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: #fff;
+    font-size: 1rem;
+    outline: none;
+  }
+
+  input:focus { border-color: #5b8dee; }
+
+  button {
+    padding: 0.75rem 1.5rem;
+    background: #5b8dee;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+
+  button:hover { opacity: 0.85; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  #error {
+    color: #e07a5f;
+    margin-bottom: 1rem;
+    display: none;
+  }
+
+  #loading {
+    color: #8a9ab5;
+    margin-bottom: 1rem;
+    display: none;
+  }
+
+  .card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 1rem;
+    display: none;
+  }
+
+  .city { font-size: 2rem; font-weight: 600; }
+  .temp { font-size: 4rem; font-weight: 300; margin: 0.5rem 0; }
+  .desc { font-size: 1rem; color: #c4cfe0; text-transform: capitalize; }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+
+  .metric {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 1rem;
+    display: none;
+  }
+
+  .metric-label {
+    font-size: 0.75rem;
+    color: #8a9ab5;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.5rem;
+  }
+
+  .metric-value { font-size: 1.8rem; font-weight: 500; }
+  .metric-unit  { font-size: 0.8rem; color: #8a9ab5; }
+
+  @media (max-width: 600px) {
+    .metrics { grid-template-columns: 1fr 1fr; }
+    .temp { font-size: 3rem; }
+  }
+</style>
+</head>
+<body>
+
+<h1>🌤 Weather Dashboard</h1>
+
+<div class="search-row">
+  <input type="text" id="cityInput" placeholder="Enter city name…" />
+  <button id="searchBtn" onclick="fetchWeather()">Search</button>
+</div>
+
+<div id="loading">⏳ Fetching weather data…</div>
+<div id="error"></div>
+
+<!-- Main weather card -->
+<div class="card" id="mainCard">
+  <div class="city" id="cityName"></div>
+  <div class="temp" id="temp"></div>
+  <div class="desc" id="desc"></div>
+</div>
+
+<!-- Metrics -->
+<div class="metrics">
+  <div class="metric" id="humCard">
+    <div class="metric-label">Humidity</div>
+    <div class="metric-value" id="humidity"></div>
+    <div class="metric-unit">%</div>
+  </div>
+  <div class="metric" id="windCard">
+    <div class="metric-label">Wind Speed</div>
+    <div class="metric-value" id="wind"></div>
+    <div class="metric-unit">km/h</div>
+  </div>
+  <div class="metric" id="visCard">
+    <div class="metric-label">Visibility</div>
+    <div class="metric-value" id="visibility"></div>
+    <div class="metric-unit">km</div>
+  </div>
+</div>
+
+<script>
+  const cityInput = document.getElementById('cityInput');
+  const searchBtn = document.getElementById('searchBtn');
+  const loadingEl = document.getElementById('loading');
+  const errorEl   = document.getElementById('error');
+
+  // Allow Enter key to trigger search
+  cityInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') fetchWeather();
+  });
+
+  // ── Main function ──────────────────────────────────────────
+  async function fetchWeather() {
+    const city = cityInput.value.trim();
+    if (!city) { showError('Please enter a city name.'); return; }
+
+    setLoading(true);
+    hideError();
+    hideResults();
+
+    try {
+      // Step 1: Geocode city → lat/lon (Open-Meteo, free, no API key)
+      const geoRes = await fetch(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&format=json`
+      );
+      if (!geoRes.ok) throw new Error(`Geocoding failed (HTTP ${geoRes.status})`);
+
+      const geoData = await geoRes.json();
+      if (!geoData.results?.length) throw new Error(`City "${city}" not found. Try a different spelling.`);
+
+      const { latitude, longitude, name, country } = geoData.results[0];
+
+      // Step 2: Fetch live weather data
+      const weatherRes = await fetch(
+        `https://api.open-meteo.com/v1/forecast` +
+        `?latitude=${latitude}&longitude=${longitude}` +
+        `&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,visibility` +
+        `&timezone=auto`
+      );
+      if (!weatherRes.ok) throw new Error(`Weather fetch failed (HTTP ${weatherRes.status})`);
+
+      const weatherData = await weatherRes.json();
+
+      // Step 3: Parse nested JSON and render
+      renderWeather(name, country, weatherData);
+
+    } catch (err) {
+      // Handle network errors vs API errors
+      if (err instanceof TypeError) {
+        showError('Network error — check your internet connection.');
+      } else {
+        showError(err.message);
+      }
+    } finally {
+      setLoading(false);
+      searchBtn.disabled = false;
+    }
+  }
+
+  // ── Render parsed data to the DOM ─────────────────────────
+  function renderWeather(city, country, data) {
+    // Destructure nested current weather object
+    const {
+      temperature_2m,
+      relative_humidity_2m,
+      weather_code,
+      wind_speed_10m,
+      visibility
+    } = data.current;
+
+    // WMO weather code descriptions
+    const descriptions = {
+      0:'Clear sky', 1:'Mainly clear', 2:'Partly cloudy', 3:'Overcast',
+      45:'Fog', 51:'Light drizzle', 61:'Light rain', 63:'Moderate rain',
+      65:'Heavy rain', 71:'Light snow', 80:'Rain showers', 95:'Thunderstorm'
+    };
+
+    // Populate main card
+    document.getElementById('cityName').textContent = `${city}, ${country}`;
+    document.getElementById('temp').textContent     = `${Math.round(temperature_2m)}°C`;
+    document.getElementById('desc').textContent     = descriptions[weather_code] ?? `Code ${weather_code}`;
+
+    // Populate metric cards
+    document.getElementById('humidity').textContent   = relative_humidity_2m;
+    document.getElementById('wind').textContent       = Math.round(wind_speed_10m * 3.6); // m/s → km/h
+    document.getElementById('visibility').textContent = (visibility / 1000).toFixed(1);
+
+    // Show all cards
+    showResults();
+  }
+
+  // ── UI helpers ─────────────────────────────────────────────
+  function setLoading(on) {
+    loadingEl.style.display = on ? 'block' : 'none';
+    searchBtn.disabled = on;
+  }
+
+  function showError(msg) {
+    errorEl.textContent = '⚠ ' + msg;
+    errorEl.style.display = 'block';
+  }
+
+  function hideError() { errorEl.style.display = 'none'; }
+
+  function showResults() {
+    document.getElementById('mainCard').style.display = 'block';
+    ['humCard','windCard','visCard'].forEach(id => {
+      document.getElementById(id).style.display = 'block';
+    });
+  }
+
+  function hideResults() {
+    document.getElementById('mainCard').style.display = 'none';
+    ['humCard','windCard','visCard'].forEach(id => {
+      document.getElementById(id).style.display = 'none';
+    });
+  }
+</script>
+
+</body>
+</html>
